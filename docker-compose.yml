@@ -100,6 +100,8 @@ services:
     networks:
       - powergrid-internal
     depends_on:
+      core-migrate:
+        condition: service_completed_successfully
       core-db:
         condition: service_healthy
       rabbitmq:
@@ -144,9 +146,63 @@ services:
     networks:
       - powergrid-internal
     depends_on:
+      audit-migrate:
+        condition: service_completed_successfully
       audit-db:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+
+  core-migrate:
+    image: postgres:16.6
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - >
+        PGPASSWORD="$${POSTGRES_PASSWORD}"
+        psql
+        -h core-db
+        -U "$${POSTGRES_USER}"
+        -d "$${POSTGRES_DB}"
+        -v ON_ERROR_STOP=1
+        -f /migrations/001_initial.sql
+    environment:
+      POSTGRES_USER: core_user
+      POSTGRES_PASSWORD: change_me_core
+      POSTGRES_DB: powergrid_core
+    volumes:
+      - ../powergrid-core-service/src/infra/database/migrations/001_initial.sql:/migrations/001_initial.sql:ro
+    networks:
+      - powergrid-internal
+    depends_on:
+      core-db:
+        condition: service_healthy
+
+  audit-migrate:
+    image: postgres:16.6
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - >
+        PGPASSWORD="$${POSTGRES_PASSWORD}"
+        psql
+        -h audit-db
+        -U "$${POSTGRES_USER}"
+        -d "$${POSTGRES_DB}"
+        -v ON_ERROR_STOP=1
+        -f /migrations/001_initial.sql
+    environment:
+      POSTGRES_USER: audit_user
+      POSTGRES_PASSWORD: change_me_audit
+      POSTGRES_DB: powergrid_audit
+    volumes:
+      - ../powergrid-audit-service/src/database/migrations/001_initial.sql:/migrations/001_initial.sql:ro
+    networks:
+      - powergrid-internal
+    depends_on:
+      audit-db:
         condition: service_healthy
 
 networks:
